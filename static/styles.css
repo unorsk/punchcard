@@ -1,0 +1,31 @@
+html {
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 10px;
+}
+
+.punchcard {
+  display: flex;
+  flex-flow: row;
+  gap: 3px;
+  padding: 10px;
+  border-color: rgb(208, 215, 222);
+  border-radius: 10px;
+  border-style: solid;
+  border-width: 1px;
+}
+.week {
+  display: flex;
+  flex-flow: column;
+  gap: 3px;
+}
+
+.week div {
+  max-height: 10px;
+}
+
+.punchcard-day {
+  width: 10px;
+  height: 10px;
+  background-color: #ebedf0;
+  border-radius: 2px;
+}
