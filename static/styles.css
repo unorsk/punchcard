@@ -26,9 +26,20 @@ html {
   padding-right: 5px;
 }
 
-.punchcard-day {
+.punchcard-day, .punchcard-day-full {
   width: 10px;
   height: 10px;
   background-color: #ebedf0;
   border-radius: 2px;
+}
+
+.punchcard-day-full {
+  background-color: #9be9a8;
+}
+
+.today {
+  border-color: rosybrown;
+  border-style: solid;
+  border-width: 1px;
+  margin: -1px;
 }

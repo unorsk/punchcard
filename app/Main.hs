@@ -3,20 +3,25 @@
 {-# LANGUAGE OverloadedRecordDot #-}
 
 module Main where
-import Web.Scotty (scotty, get, param, html)
-import Lucid.Html5 (div_, class_, body_, link_, rel_, href_, button_, method_, )
+import Web.Scotty (scotty, get, post, param, html)
+import Lucid.Html5 (div_, class_, body_, link_, rel_, href_, button_, method_, title_, )
 import Lucid ( Html, renderText, toHtml, form_, head_ )
 import Data.Time.Calendar
 import Data.Foldable (fold)
-import Web.Scotty.Trans (middleware)
+import Web.Scotty.Trans (middleware, redirect)
 import Network.Wai.Middleware.Static (staticPolicy, noDots, (>->), addBase)
 import Data.Pool (Pool, newPool, defaultPoolConfig, withResource)
 import Database.MySQL.Simple
 import GHC.Generics
 import Control.Monad.IO.Class (MonadIO(liftIO))
 import Dhall (FromDhall, auto, input)
+import Data.List (find)
+import Data.Maybe (fromMaybe)
+import Data.Time (getCurrentTime)
+import Data.Time.Clock (utctDay)
+import Data.Text (pack)
 
-data MyConnectInfo = MyConnectInfo 
+data MyConnectInfo = MyConnectInfo
   {
     host :: String
     , user :: String
@@ -30,18 +35,24 @@ instance FromDhall MyConnectInfo
 data DayDataPoint = DayDataPoint
   {
     count :: Int
-    , date :: String
+    , date :: Day
   }
   deriving (Eq, Generic)
 
+instance Show DayDataPoint where
+  show (DayDataPoint count date) = (show count) <> (show date)
+
 lastMonday :: Day
-lastMonday = fromGregorian 2023 8 5
+lastMonday = fromGregorian 2023 5 1
 
 yearInWeeks :: [Day]
 yearInWeeks = [lastMonday .. addDays 370 lastMonday]
 
-printDay :: Day -> Html ()
-printDay day = div_ [class_ "punchcard-day"] $ toHtml ("" :: String)
+printDay :: Day -> DayDataPoint -> Html ()
+printDay today day =
+  let dayClass = if day.count == 0 then "punchcard-day" else "punchcard-day-full"
+      todayClass = if day.date == today then " today" else "" in
+    div_ [class_ (dayClass <> todayClass), title_ (pack $ (show day.date) <> " " <> show day.count)] $ toHtml ("" :: String)
 
 weekDaysHeaders :: Html()
 weekDaysHeaders =
@@ -59,36 +70,64 @@ renderStyles = link_ [rel_ "stylesheet", href_ "styles.css" ]
 
 renderPunchButtons :: Html ()
 renderPunchButtons =
-  form_ [method_ "POST"] (button_ "PUNCH!")
+  form_ [method_ "POST"] (button_ "PUNCH IT!")
 
-renderPunchCard :: Html ()
-renderPunchCard =
-  let periods = map printDay yearInWeeks in
+renderPunchCard :: [DayDataPoint] -> Day -> Html ()
+renderPunchCard days today =
+  let periods = map (printDay today) days in
   -- renderText (div_ [class_ "punchcard"] (fold periods))
   div_ [class_ "punchcard"] (weekDaysHeaders <> splitPeriodsIntoWeeks periods)
 
-initPool :: ConnectInfo -> IO (Pool Connection)
-initPool connectInfo = newPool $ defaultPoolConfig (connect connectInfo) close 60.0 10
+initPool :: MyConnectInfo -> IO (Pool Connection)
+initPool connInfo =
+  let mysqlConnInfo = defaultConnectInfo {
+    connectHost = connInfo.host
+    , connectUser = connInfo.user
+    , connectPassword = connInfo.password
+    , connectDatabase = connInfo.database} in
+  newPool $ defaultPoolConfig (connect mysqlConnInfo) close 60.0 10
+
+addOrUpdateToday :: Connection -> IO ()
+addOrUpdateToday conn = do
+  r <- query_ conn "select `id`, `count` from `datapoints` where `date` = CURRENT_DATE()"
+  case length r of
+    0 -> do
+      _ <- execute_ conn "insert into `datapoints` (`date`) values (CURRENT_DATE())"
+      return ()
+    _ -> mapM_ (\(id_::Int, count::Int) -> do
+          _ <- execute conn "update `datapoints` set `count` = `count`+1 where `id` = ?" $ Only id_
+          return ()
+        ) r
 
 retrievePeriods :: Connection -> IO [DayDataPoint]
 retrievePeriods conn = do
-  r <- query_ conn "select * from datapoints"
+  -- r <- query_ conn "select `count`, CAST(`date` as CHAR(50)) from datapoints"
+  r <- query_ conn "select `count`, `date` from datapoints"
   return $ map (uncurry DayDataPoint) r
 
 main :: IO ()
 main = do
   connInfo :: MyConnectInfo <- input auto "./local.dhall"
-  pool <- initPool (defaultConnectInfo {connectHost = connInfo.host, connectUser = connInfo.user, connectPassword = connInfo.password, connectDatabase = connInfo.database})
+  pool <- initPool connInfo
   scotty 3000 $ do
     middleware $ staticPolicy (noDots >-> addBase "static")
     get "/hello/:hello" $ do
         hello <- param "hello"
         html $ mconcat ["<h1>", hello, "</h1>"]
+    post "/" $ do
+        liftIO $ withResource pool addOrUpdateToday
+        redirect "/"
     get "/" $ do
         -- todo handle exceptions!
-        preiods <- liftIO $ withResource pool retrievePeriods
+        periods <- liftIO $ withResource pool retrievePeriods
+        -- _ <- liftIO $ print periods
         -- combine empty periods + periods from database that have some data
         -- and display the punch card
-        html $ renderText (head_ renderStyles
-          <> body_ renderPunchCard
-            <> renderPunchButtons)
+        today <- liftIO getCurrentTime
+        let days = map (\y ->
+                let count = find (\d -> d.date == y) periods in
+                  fromMaybe DayDataPoint {count = 0, date = y} count) yearInWeeks in do
+            -- _ <- liftIO $ print days
+            html $ renderText (head_ renderStyles
+              <> body_ (renderPunchCard days (utctDay today))
+                <> renderPunchButtons)
