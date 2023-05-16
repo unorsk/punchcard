@@ -3,9 +3,24 @@ html {
   font-size: 10px;
 }
 
+h2 {
+  text-transform: uppercase;
+  font-weight: 300;
+}
+
+.groups_links a {
+  text-decoration: none;
+}
+
 .groups_links {
   display: flex;
-  flex-flow: column;
+  flex-flow: row;
+  text-transform: uppercase;
+  gap: 10px;
+}
+
+.groups_links > .active_group {
+  text-decoration: underline;
 }
 
 .punchcard {

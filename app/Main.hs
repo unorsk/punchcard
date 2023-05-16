@@ -4,7 +4,7 @@
 
 module Main where
 import Web.Scotty (scotty, get, post, param, html)
-import Lucid.Html5 (div_, class_, body_, link_, rel_, href_, button_, method_, title_, a_, )
+import Lucid.Html5 (h2_, div_, class_, body_, link_, rel_, href_, button_, method_, title_, a_, action_, )
 import Lucid ( Html, renderText, toHtml, form_, head_ )
 import Data.Time.Calendar
 import Data.Foldable (fold)
@@ -20,6 +20,7 @@ import Data.Maybe (fromMaybe)
 import Data.Time (getCurrentTime)
 import Data.Time.Clock (utctDay)
 import Data.Text (pack)
+import qualified Data.Text.Lazy as L
 
 data MyConnectInfo = MyConnectInfo
   {
@@ -82,17 +83,23 @@ splitPeriodsIntoWeeks periods =
 renderStyles :: Html ()
 renderStyles = link_ [rel_ "stylesheet", href_ "styles.css" ]
 
-renderGroup :: DayDataPointGroup -> Html ()
-renderGroup g =
-  a_ [href_ (pack ("/" <> show g.id))] (toHtml g.name)
+renderGroup :: DayDataPointGroup -> Bool -> Html ()
+renderGroup g isActive =
+  let isActiveClass = if isActive then "active_group" else "" in
+    a_ [href_ (pack ("/" <> show g.id)), class_ isActiveClass] (toHtml g.name)
 
-renderGroups :: [DayDataPointGroup] -> Html ()
-renderGroups groups =
-  div_ [class_ "groups_links"] (mconcat (map renderGroup groups))
+renderGroups :: [DayDataPointGroup] -> Int -> Html ()
+renderGroups groups currentGroupId =
+  div_ [class_ "groups_links"] (mconcat (map (\g -> renderGroup g (g.id == currentGroupId)) groups))
 
-renderPunchButtons :: Html ()
-renderPunchButtons =
-  form_ [method_ "POST"] (button_ "PUNCH IT!")
+renderPunchCardHeader :: String -> Html ()
+renderPunchCardHeader groupName =
+  -- a_ [href_ "/"] "<" <>
+  h2_ (toHtml groupName)
+
+renderPunchButtons :: Int -> Html ()
+renderPunchButtons groupId =
+  form_ [method_ "POST", action_ ("/" <> pack (show groupId))] (button_ "PUNCH IT!")
 
 renderPunchCard :: [DayDataPoint] -> Day -> Html ()
 renderPunchCard days today =
@@ -119,17 +126,22 @@ initPool connInfo =
     , connectDatabase = connInfo.database} in
   newPool $ defaultPoolConfig (connect mysqlConnInfo) close 60.0 10
 
-addOrUpdateToday :: Connection -> IO ()
-addOrUpdateToday conn = do
-  r <- query_ conn "select `id`, `count` from `datapoints` where `date` = CURRENT_DATE()"
+addOrUpdateToday :: Connection -> Int -> Int -> IO ()
+addOrUpdateToday conn groupId userId = do
+  r <- query conn "select `id`, `count` from `datapoints` where `date` = CURRENT_DATE() and `group_id` = ? and `user_id` = ?" [groupId, userId]
   case length r of
     0 -> do
-      _ <- execute_ conn "insert into `datapoints` (`date`) values (CURRENT_DATE())"
+      _ <- execute conn "insert into `datapoints` (`date`, `group_id`, `user_id`) values (CURRENT_DATE(), ?, ?)" [groupId, userId]
       return ()
-    _ -> mapM_ (\(id_::Int, count::Int) -> do
+    _ -> mapM_ (\(id_::Int, _::Int) -> do
           _ <- execute conn "update `datapoints` set `count` = `count`+1 where `id` = ?" $ Only id_
           return ()
         ) r
+
+retrieveGroupName :: Connection -> Int -> Int -> IO String
+retrieveGroupName conn groupId userId = do
+  r::[(Int, String)] <- query conn "select `id`, `name` from datapoints_groups where `id` = ? and `user_id` = ?" [groupId, userId]
+  return (mconcat $ map (\(_, s) -> s) r)
 
 retrieveGroupsForUser :: Connection -> Int -> IO [DayDataPointGroup]
 retrieveGroupsForUser conn userId = do
@@ -155,25 +167,27 @@ main = do
     get "/hello/:hello" $ do
         hello <- param "hello"
         html $ mconcat ["<h1>", hello, "</h1>"]
-    post "/" $ do
-        liftIO $ withResource pool addOrUpdateToday
-        redirect "/"
+    post "/:groupId" $ do
+        groupId::Int <- param "groupId"
+        liftIO $ withResource pool (\c -> addOrUpdateToday c groupId userId)
+        redirect ("/" <> L.pack (show groupId))
     get "/" $ do
       groups <- liftIO $ withResource pool (\c -> retrieveGroupsForUser c userId)
       html $ renderText (head_ renderStyles
-              <> body_ (renderGroups groups))
+              <> body_ (renderGroups groups (-1)))
     get "/:groupId" $ do
         groupId::Int <- param "groupId"
-        -- todo handle exceptions!
+        -- todo handle database exceptions!
+        groups <- liftIO $ withResource pool (\c -> retrieveGroupsForUser c userId)
+        groupName <- liftIO $ withResource pool (\c -> retrieveGroupName c groupId userId)
         periods <- liftIO $ withResource pool (\c -> retrievePeriods c groupId userId)
-        -- _ <- liftIO $ print periods
-        -- combine empty periods + periods from database that have some data
-        -- and display the punch card
         today <- liftIO getCurrentTime
         let days = map (\y ->
                 let count = find (\d -> d.date == y) periods in
                   fromMaybe DayDataPoint {count = 0, date = y} count) yearInWeeks in do
             -- _ <- liftIO $ print days
             html $ renderText (head_ renderStyles
-              <> body_ (renderPunchCard days (utctDay today))
-                <> renderPunchButtons)
+              <> body_ (renderGroups groups groupId)
+                <> renderPunchCardHeader groupName
+                <> renderPunchCard days (utctDay today)
+                <> renderPunchButtons groupId)
