@@ -21,6 +21,7 @@ import Data.Time (getCurrentTime)
 import Data.Time.Clock (utctDay)
 import Data.Text (pack)
 import qualified Data.Text.Lazy as L
+-- import Database.MySQL.Base (SSLInfo(..), sslCipher)
 
 data MyConnectInfo = MyConnectInfo
   {
@@ -113,10 +114,16 @@ initPool connInfo =
   -- let mysqlConnInfo = ConnectInfo {
   --   connectHost = connInfo.host
   --   , connectPort = 3306
-  --   , connectSSL = Nothing
+  --   , connectSSL = Just SSLInfo {
+  --     sslKey = ""
+  --     -- , sslCA = "/etc/ssl/certs/ca-certificates.crt"
+  --     , sslCert = "/etc/ssl/cert.pem"
+  --     -- , sslCAPath = "/etc/ssl/cert.pem"
+  --     , sslCiphers = "TLSv1.2"
+  --   }
   --   , connectUser = connInfo.user
   --   , connectOptions = []
-  --   , connectPath = "sslaccept=strict"
+  --   , connectPath = ""
   --   , connectPassword = connInfo.password
   --   , connectDatabase = connInfo.database} in
   let mysqlConnInfo = defaultConnectInfo {
