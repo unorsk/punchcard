@@ -67,7 +67,7 @@ executable server
     -- other-extensions:
 
     -- Other library packages from which modules are imported.
-    build-depends:    base ^>=4.17.0.0, scotty, lucid2, text, time, wai-middleware-static, mysql-simple >= 0.4.9, resource-pool, dhall, bytestring
+    build-depends:    base == 4.16.4.0, scotty, lucid2, text, time, wai-middleware-static, mysql-simple >= 0.4.9, resource-pool, dhall, bytestring
 
     -- Directories containing source files.
     hs-source-dirs:   app

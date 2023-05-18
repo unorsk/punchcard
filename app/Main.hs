@@ -138,7 +138,7 @@ addOrUpdateToday conn groupId userId = do
   r <- query conn "select `id`, `count` from `datapoints` where `date` = CURRENT_DATE() and `group_id` = ? and `user_id` = ?" [groupId, userId]
   case length r of
     0 -> do
-      _ <- execute conn "insert into `datapoints` (`date`, `group_id`, `user_id`) values (CURRENT_DATE(), ?, ?)" [groupId, userId]
+      _ <- execute conn "insert into `datapoints` (`date`, `group_id`, `user_id`, `count`) values (CURRENT_DATE(), ?, ?, 1)" [groupId, userId]
       return ()
     _ -> mapM_ (\(id_::Int, _::Int) -> do
           _ <- execute conn "update `datapoints` set `count` = `count`+1 where `id` = ?" $ Only id_
