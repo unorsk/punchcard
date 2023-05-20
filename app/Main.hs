@@ -4,11 +4,11 @@
 
 module Main where
 import Web.Scotty (scotty, get, post, param, html)
-import Lucid.Html5 (h2_, div_, class_, body_, link_, rel_, href_, button_, method_, title_, a_, action_, )
+import Lucid.Html5 (h2_, div_, class_, body_, link_, rel_, href_, button_, method_, title_, a_, action_, input_, type_, name_, )
 import Lucid ( Html, renderText, toHtml, form_, head_ )
 import Data.Time.Calendar
 import Data.Foldable (fold)
-import Web.Scotty.Trans (middleware, redirect)
+import Web.Scotty.Trans (middleware, redirect, body, )
 import Network.Wai.Middleware.Static (staticPolicy, noDots, (>->), addBase)
 import Data.Pool (Pool, newPool, defaultPoolConfig, withResource)
 import Database.MySQL.Simple
@@ -21,6 +21,7 @@ import Data.Time (getCurrentTime)
 import Data.Time.Clock (utctDay)
 import Data.Text (pack)
 import qualified Data.Text.Lazy as L
+import qualified Data.ByteString.Lazy.Char8 as BL
 -- import Database.MySQL.Base (SSLInfo(..), sslCipher)
 
 data MyConnectInfo = MyConnectInfo
@@ -89,9 +90,13 @@ renderGroup g isActive =
   let isActiveClass = if isActive then "active_group" else "" in
     a_ [href_ (pack ("/" <> show g.id)), class_ isActiveClass] (toHtml g.name)
 
+addGroupLink :: Html ()
+addGroupLink =
+  a_ [href_ "/add_group"] "+ Add"
+
 renderGroups :: [DayDataPointGroup] -> Int -> Html ()
 renderGroups groups currentGroupId =
-  div_ [class_ "groups_links"] (mconcat (map (\g -> renderGroup g (g.id == currentGroupId)) groups))
+  div_ [class_ "groups_links"] (mconcat (map (\g -> renderGroup g (g.id == currentGroupId)) groups) <> addGroupLink)
 
 renderPunchCardHeader :: String -> Html ()
 renderPunchCardHeader groupName =
@@ -150,6 +155,11 @@ retrieveGroupName conn groupId userId = do
   r::[(Int, String)] <- query conn "select `id`, `name` from datapoints_groups where `id` = ? and `user_id` = ?" [groupId, userId]
   return (mconcat $ map (\(_, s) -> s) r)
 
+addNewGroup :: Connection -> String -> Int -> IO ()
+addNewGroup conn groupName userId = do
+  _ <- execute conn "insert into `datapoints_groups` (`name`, `user_id`) values (?, ?)" (groupName, userId)
+  return ()
+
 retrieveGroupsForUser :: Connection -> Int -> IO [DayDataPointGroup]
 retrieveGroupsForUser conn userId = do
   r <- query conn "select `id`, `name` from datapoints_groups where `user_id` = ?" $ Only userId
@@ -182,6 +192,14 @@ main = do
       groups <- liftIO $ withResource pool (\c -> retrieveGroupsForUser c userId)
       html $ renderText (head_ renderStyles
               <> body_ (renderGroups groups (-1)))
+    post "/add_group" $ do
+      b <- body
+      _ <- liftIO $ putStrLn $ BL.unpack b
+      -- _ <- liftIO $ withResource pool (\c -> addNewGroup c (L.unpack $ decodeUtf8 b) userId)
+      redirect "/"
+    get "/add_group" $ do
+      html $ renderText (head_ renderStyles
+              <> body_ (form_ [method_ "POST", name_ "group", action_ "/add_group"] (input_ [type_ "text", name_ "name"] <> button_ [action_ "submit"] "ADD")))
     get "/:groupId" $ do
         groupId::Int <- param "groupId"
         -- todo handle database exceptions!
