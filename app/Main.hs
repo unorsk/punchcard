@@ -3,7 +3,7 @@
 {-# LANGUAGE OverloadedRecordDot #-}
 
 module Main where
-import Web.Scotty (scotty, get, post, param, html)
+import Web.Scotty (scotty, get, post, param, html, ActionM)
 import Lucid.Html5 (h2_, div_, class_, body_, link_, rel_, href_, button_, method_, title_, a_, action_, input_, type_, name_, )
 import Lucid ( Html, renderText, toHtml, form_, head_ )
 import Data.Time.Calendar
@@ -38,6 +38,7 @@ instance FromDhall MyConnectInfo
 data DayDataPoint = DayDataPoint
   {
     count :: Int
+    , groupId :: Int
     , date :: Day
   }
   deriving (Eq, Generic)
@@ -50,7 +51,7 @@ data DayDataPointGroup = DayDataPointGroup
   deriving (Eq, Generic)
 
 instance Show DayDataPoint where
-  show (DayDataPoint count date) = (show count) <> (show date)
+  show (DayDataPoint count _ date) = show count <> show date
 
 lastMonday :: Day
 lastMonday = fromGregorian 2023 5 1
@@ -69,7 +70,7 @@ printDay :: Day -> DayDataPoint -> Html ()
 printDay today day =
   -- day-contributions-
   let todayClass = if day.date == today then " today" else "" in
-    div_ [class_ ("punchcard-day " <> pack (dayClass day.count) <> todayClass), title_ (pack $ (show day.date) <> " " <> show day.count)] $ toHtml ("" :: String)
+    a_ [href_ $ pack ("/" <> show day.groupId <> "/" <> show day.date), class_ ("punchcard-day " <> pack (dayClass day.count) <> todayClass), title_ (pack $ (show day.date) <> " " <> show day.count)] $ toHtml ("" :: String)
 
 weekDaysHeaders :: Html()
 weekDaysHeaders =
@@ -83,7 +84,7 @@ splitPeriodsIntoWeeks periods =
     week <> Data.Foldable.fold (if length rest > 0 then [splitPeriodsIntoWeeks rest] else [])
 
 renderStyles :: Html ()
-renderStyles = link_ [rel_ "stylesheet", href_ "styles.css" ]
+renderStyles = link_ [rel_ "stylesheet", href_ "/styles.css" ]
 
 renderGroup :: DayDataPointGroup -> Bool -> Html ()
 renderGroup g isActive =
@@ -166,13 +167,27 @@ retrieveGroupsForUser conn userId = do
   return $ map (uncurry DayDataPointGroup) r
 
 retrievePeriods :: Connection -> Int -> Int -> IO [DayDataPoint]
-retrievePeriods conn groupId userId = do
-  -- r <- query_ conn "select `count`, CAST(`date` as CHAR(50)) from datapoints"
-  r <- query conn "select `count`, `date` from datapoints where `user_id` = ? and `group_id` = ?" [userId, groupId]
-  return $ map (uncurry DayDataPoint) r
+retrievePeriods conn groupId userId =
+  map (\(count::Int, day::Day) -> DayDataPoint count groupId day)
+  <$> query conn "select `count`, `date` from datapoints where `user_id` = ? and `group_id` = ?" [userId, groupId]
 
 getUserId :: IO Int
 getUserId = pure 1
+
+getRenderGroup :: Day -> Int -> Int -> Pool Connection -> ActionM()
+getRenderGroup today groupId userId pool = do
+  groups <- liftIO $ withResource pool (\c -> retrieveGroupsForUser c userId)
+  groupName <- liftIO $ withResource pool (\c -> retrieveGroupName c groupId userId)
+  periods <- liftIO $ withResource pool (\c -> retrievePeriods c groupId userId)
+  let days = map (\y ->
+          let count = find (\d -> d.date == y) periods in
+            fromMaybe DayDataPoint {count = 0, groupId = groupId, date = y} count) yearInWeeks in do
+      -- _ <- liftIO $ print days
+      html $ renderText (head_ renderStyles
+        <> body_ (renderGroups groups groupId)
+          <> renderPunchCardHeader groupName
+          <> renderPunchCard days today
+          <> renderPunchButtons groupId)
 
 main :: IO ()
 main = do
@@ -203,16 +218,11 @@ main = do
     get "/:groupId" $ do
         groupId::Int <- param "groupId"
         -- todo handle database exceptions!
-        groups <- liftIO $ withResource pool (\c -> retrieveGroupsForUser c userId)
-        groupName <- liftIO $ withResource pool (\c -> retrieveGroupName c groupId userId)
-        periods <- liftIO $ withResource pool (\c -> retrievePeriods c groupId userId)
         today <- liftIO getCurrentTime
-        let days = map (\y ->
-                let count = find (\d -> d.date == y) periods in
-                  fromMaybe DayDataPoint {count = 0, date = y} count) yearInWeeks in do
-            -- _ <- liftIO $ print days
-            html $ renderText (head_ renderStyles
-              <> body_ (renderGroups groups groupId)
-                <> renderPunchCardHeader groupName
-                <> renderPunchCard days (utctDay today)
-                <> renderPunchButtons groupId)
+        getRenderGroup (utctDay today) groupId userId pool
+    get "/:groupId/:day" $ do
+        groupId::Int <- param "groupId"
+        day::String <- param "day"
+        -- _ <- liftIO $ putStrLn day
+        -- todo handle database exceptions!
+        getRenderGroup (read day::Day) groupId userId pool
