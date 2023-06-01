@@ -22,6 +22,7 @@ import Data.Time.Clock (utctDay)
 import Data.Text (pack)
 import qualified Data.Text.Lazy as L
 import qualified Data.ByteString.Lazy.Char8 as BL
+import Data.Char (toUpper)
 -- import Database.MySQL.Base (SSLInfo(..), sslCipher)
 
 data MyConnectInfo = MyConnectInfo
@@ -183,7 +184,7 @@ getRenderGroup today groupId userId pool = do
           let count = find (\d -> d.date == y) periods in
             fromMaybe DayDataPoint {count = 0, groupId = groupId, date = y} count) yearInWeeks in do
       -- _ <- liftIO $ print days
-      html $ renderText (head_ renderStyles
+      html $ renderText (head_ renderStyles <> title_ (toHtml $ "👊 " <> map toUpper groupName)
         <> body_ (renderGroups groups groupId)
           <> renderPunchCardHeader groupName
           <> renderPunchCard days today
