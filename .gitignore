@@ -1,2 +1,3 @@
 dist-newstyle
 local.dhall
+db.sqlite

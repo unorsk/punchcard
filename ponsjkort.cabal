@@ -11,20 +11,41 @@ extra-doc-files: CHANGELOG.md
 common warnings
   ghc-options: -Wall
 
+library
+  import:             warnings
+  default-extensions: OverloadedStrings
+  exposed-modules:
+    DBClient
+    Model
+    UI
+
+  build-depends:
+    , base           ^>=4.17.0.0
+    , bytestring
+    , lucid2
+    , sqlite-simple
+    , text
+    , time
+
+  hs-source-dirs:     lib
+  default-language:   GHC2021
+
 executable server
-  import:           warnings
-  main-is:          Main.hs
+  import:             warnings
+  default-extensions: OverloadedStrings
+  main-is:            Main.hs
   build-depends:
     , base                   ^>=4.17.0.0
     , bytestring
     , dhall
     , lucid2
-    , mysql-simple           >=0.4.9
+    , ponsjkort
     , resource-pool
     , scotty
+    , sqlite-simple
     , text
     , time
     , wai-middleware-static
 
-  hs-source-dirs:   app
-  default-language: GHC2021
+  hs-source-dirs:     app
+  default-language:   GHC2021

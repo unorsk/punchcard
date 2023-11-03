@@ -1,21 +1,16 @@
-CREATE TABLE `datapoints_users` (
-  `id`    INT NOT NULL AUTO_INCREMENT,
-  `name`  TEXT NOT NULL,
-  PRIMARY KEY (`id`)
+"CREATE TABLE IF NOT EXISTS datapoints_users (
+  `id`    INTEGER PRIMARY KEY,
+  `name`  TEXT NOT NULL
 );
-
-CREATE TABLE `datapoints_groups` (
-  `id`      INT NOT NULL AUTO_INCREMENT,
-  `user_id` INT NOT NULL,
-  `name`    TEXT NOT NULL,
-  PRIMARY KEY (`id`)
+CREATE TABLE IF NOT EXISTS datapoints_groups (
+  `id`      INTEGER PRIMARY KEY,
+  `user_id` INTEGER NOT NULL,
+  `name`    TEXT NOT NULL
 );
-
-CREATE TABLE `datapoints` (
-  `id`        INT NOT NULL AUTO_INCREMENT,
-  `user_id`   INT NOT NULL, -- so that I don't need to join with the users table (:
-  `group_id`  INT NOT NULL,
-  `count`     INT DEFAULT 0,
-  `date`      DATE NOT NULL,
-  PRIMARY KEY (`id`)
-);
+CREATE TABLE IF NOT EXISTS datapoints (
+  `id`        INTEGER PRIMARY KEY,
+  `user_id`   INTEGER NOT NULL,
+  `group_id`  INTEGER NOT NULL,
+  `count`     INTEGER DEFAULT 0,
+  `date`      DATETIME NOT NULL
+);"
