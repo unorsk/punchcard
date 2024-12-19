@@ -13,7 +13,6 @@ import Data.Time.Calendar (Day)
 import Database.SQLite.Simple
   ( Connection
   , NamedParam ((:=))
-  , close
   , executeNamed
   , execute_
   , open

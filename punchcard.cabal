@@ -1,5 +1,5 @@
 cabal-version:   3.4
-name:            ponsjkort
+name:            punchcard
 version:         0.1.0.0
 license:         MIT
 license-file:    LICENSE
@@ -20,7 +20,7 @@ library
     UI
 
   build-depends:
-    , base           ^>=4.17.0.0
+    , base           ^>=4.19.1.0
     , bytestring
     , lucid2
     , sqlite-simple
@@ -35,11 +35,11 @@ executable server
   default-extensions: OverloadedStrings
   main-is:            Main.hs
   build-depends:
-    , base                   ^>=4.17.0.0
+    , base                   ^>=4.19.1.0
     , bytestring
     , dhall
     , lucid2
-    , ponsjkort
+    , punchcard
     , resource-pool
     , scotty
     , sqlite-simple

@@ -32,8 +32,9 @@ pageAddGroup =
           )
 
 
+-- TODO (:
 lastMonday :: Day
-lastMonday = fromGregorian 2023 5 1
+lastMonday = fromGregorian 2024 12 16
 
 yearInWeeks :: [Day]
 yearInWeeks = [lastMonday .. addDays 370 lastMonday]
