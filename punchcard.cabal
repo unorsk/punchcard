@@ -1,4 +1,4 @@
-cabal-version:   3.4
+cabal-version:   3.12
 name:            punchcard
 version:         0.1.0.0
 license:         MIT
@@ -20,7 +20,7 @@ library
     UI
 
   build-depends:
-    , base           ^>=4.19.1.0
+    , base           ^>=4.21.0.0
     , bytestring
     , lucid2
     , sqlite-simple
@@ -28,16 +28,15 @@ library
     , time
 
   hs-source-dirs:     lib
-  default-language:   GHC2021
+  default-language:   GHC2024
 
 executable server
   import:             warnings
   default-extensions: OverloadedStrings
   main-is:            Main.hs
   build-depends:
-    , base                   ^>=4.19.1.0
+    , base                   ^>=4.21.0.0
     , bytestring
-    , dhall
     , lucid2
     , punchcard
     , resource-pool
@@ -48,4 +47,4 @@ executable server
     , wai-middleware-static
 
   hs-source-dirs:     app
-  default-language:   GHC2021
+  default-language:   GHC2024

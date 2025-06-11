@@ -1,4 +1,4 @@
-"CREATE TABLE IF NOT EXISTS datapoints_users (
+CREATE TABLE IF NOT EXISTS datapoints_users (
   `id`    INTEGER PRIMARY KEY,
   `name`  TEXT NOT NULL
 );
@@ -13,4 +13,4 @@ CREATE TABLE IF NOT EXISTS datapoints (
   `group_id`  INTEGER NOT NULL,
   `count`     INTEGER DEFAULT 0,
   `date`      DATETIME NOT NULL
-);"
+);
